@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AeroMix Elite v8.5 — Симулатор на сигнали и вълни</title>
+    <style>
+        :root { 
+            --neon-master: #ffffff;
+            --danger: #ff0055; 
+            --amber: #ffcc00; 
+            --bg: #02040a;
+        }
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body { 
+            background: var(--bg); 
+            color: #f8fafc; 
+            font-family: 'Segoe UI', Inter, system-ui, sans-serif; 
+            margin: 0; 
+            padding: 15px; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .top-bar {
+            width: 98vw;
+            max-width: 1400px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn, .audio-btn {
+            background: #0f172a;
+            color: #f8fafc;
+            border: 1px solid #334155;
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+        .nav-btn:hover { background: #1e293b; border-color: #64748b; }
+
+        .audio-btn {
+            border-color: #38bdf8;
+            color: #38bdf8;
+        }
+        .audio-btn.active {
+            background: #0284c7;
+            color: #fff;
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.5);
+        }
+
+        .workstation { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px; 
+            width: 98vw; 
+            max-width: 1400px; 
+        }
+
+        /* MASTER ЕКРАН */
+        .master-display {
+            background: #000; 
+            border: 3px solid #334155; 
+            border-radius: 20px; 
+            height: 250px;
+            position: relative; 
+            overflow: hidden; 
+            box-shadow: 0 0 40px rgba(255, 255, 255, 0.05);
+        }
+
+        .master-label {
+            position: absolute; 
+            top: 14px; 
+            left: 20px; 
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            pointer-events: none;
+        }
+        .master-title {
+            color: #fff; 
+            font-weight: 900; 
+            letter-spacing: 4px; 
+            font-size: 1.05rem; 
+            text-shadow: 0 0 10px #fff;
+        }
+        .master-sub {
+            color: #94a3b8;
+            font-size: 0.75rem;
+        }
+
+        /* МИКСЕР ГРИД */
+        .mixer-grid { 
+            display: grid; 
+            grid-template-columns: repeat(6, 1fr); 
+            gap: 12px; 
+        }
+
+        @media (max-width: 1024px) {
+            .mixer-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+        @media (max-width: 600px) {
+            .mixer-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        .channel-module {
+            background: rgba(15, 23, 42, 0.95); 
+            border: 1px solid #334155; 
+            border-radius: 18px; 
+            padding: 12px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+        }
+
+        .ch-scope-box {
+            width: 100%; 
+            height: 95px; 
+            background: #000; 
+            border-radius: 10px;
+            border: 2px solid #1e293b; 
+            position: relative; 
+            overflow: hidden;
+        }
+
+        select { 
+            background: #000; 
+            color: #fff; 
+            border: 1px solid #444; 
+            font-size: 0.72rem; 
+            width: 100%; 
+            border-radius: 6px; 
+            padding: 6px;
+            cursor: pointer;
+        }
+        
+        .fader-section { 
+            display: flex; 
+            height: 175px; 
+            gap: 14px; 
+            justify-content: center; 
+            align-items: flex-end; 
+            padding: 5px 0;
+        }
+        
+        .vu-ladder { 
+            width: 8px; 
+            height: 100%; 
+            background: #000; 
+            display: flex; 
+            flex-direction: column-reverse; 
+            gap: 1px; 
+        }
+        .led-bit { 
+            width: 100%; 
+            height: 4px; 
+            background: #111; 
+            border-radius: 1px; 
+        }
+        
+        .fader-path { 
+            width: 10px; 
+            height: 100%; 
+            background: #000; 
+            border-radius: 5px; 
+            position: relative; 
+            border: 1px solid #222; 
+            touch-action: none;
+        }
+        .fader-handle {
+            width: 34px; 
+            height: 46px; 
+            background: linear-gradient(180deg, #fff, #94a3b8);
+            border-radius: 5px; 
+            position: absolute; 
+            left: -12px; 
+            cursor: ns-resize;
+            box-shadow: 0 5px 15px rgba(0,0,0,1); 
+            z-index: 5;
+            touch-action: none;
+        }
+        .fader-handle::after { 
+            content: ''; 
+            position: absolute; 
+            top: 21px; 
+            width: 100%; 
+            height: 3px; 
+            background: #ef4444; 
+        }
+
+        canvas { width: 100%; height: 100%; display: block; }
+        .overlay-text { 
+            position: absolute; 
+            top: 5px; 
+            left: 8px; 
+            font-size: 0.62rem; 
+            font-weight: 800; 
+            color: #94a3b8; 
+            pointer-events: none; 
+            z-index: 2; 
+        }
+        .gain-badge {
+            text-align: center;
+            font-size: 0.7rem;
+            color: #94a3b8;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <a href="index.html" class="nav-btn">← Към учебни материали</a>
+        <div style="font-size: 0.85rem; color: #94a3b8; text-align: center;">
+            <strong>STEM Симулатор:</strong> Суперпозиция и синтез на вълни • д-р Адем Зейнев
+        </div>
+        <button id="audioToggle" class="audio-btn">🔇 Звук: ИЗКЛ.</button>
+    </div>
+
+    <div class="workstation">
+        <div class="master-display">
+            <div class="master-label">
+                <span class="master-title">SUMMED MASTER BUS (СУМАРЕН СИГНАЛ)</span>
+                <span class="master-sub">Изберете форма на вълната от каналите долу и променяйте амплитудата (A) чрез плъзгачите</span>
+            </div>
+            <canvas id="masterCanvas"></canvas>
+        </div>
+
+        <div class="mixer-grid" id="mixer"></div>
+    </div>
+
+<script>
+    // Защита на авторския код срещу копиране
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('keydown', e => {
+        if (
+            e.key === 'F12' ||
+            (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key.toUpperCase())) ||
+            (e.ctrlKey && ['U', 'S'].includes(e.key.toUpperCase()))
+        ) {
+            e.preventDefault();
+        }
+    });
+
+    const mixer = document.getElementById('mixer');
+    const masterCanvas = document.getElementById('masterCanvas');
+    const mCtx = masterCanvas.getContext('2d');
+    const audioToggle = document.getElementById('audioToggle');
+    
+    const chCount = 6;
+    const channels = [];
+
+    // Хармонични честоти (в Hz) за 6-те канала (C4, E4, G4, A4, C5, E5)
+    const chFreqs = [261.63, 329.63, 392.00, 440.00, 523.25, 659.25];
+    const chColors = ['#00ffff', '#ff00ff', '#ffff00', '#00ff00', '#ff4400', '#0088ff'];
+
+    const oscillators = {
+        'OFF': (t) => 0,
+        'SINE': (t) => Math.sin(t),
+        'SQUARE': (t) => Math.sin(t) > 0 ? 0.8 : -0.8,
+        'SAW': (t) => ((t % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / Math.PI - 1,
+        'MIC': (t) => Math.sin(t * 0.5) * 0.6 + Math.sin(t * 3) * 0.2 + (Math.random() - 0.5) * 0.3
+    };
+
+    // Web Audio API (Звуков синтезатор)
+    let audioCtx = null;
+    let audioEnabled = false;
+
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        channels.forEach((ch, idx) => {
+            if (!ch.oscNode) {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.frequency.value = chFreqs[idx];
+                gain.gain.value = 0;
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                ch.oscNode = osc;
+                ch.gainNode = gain;
+            }
+        });
+        updateAudioNodes();
+    }
+
+    function updateAudioNodes() {
+        if (!audioCtx) return;
+        const typeMap = { 'SINE': 'sine', 'SQUARE': 'square', 'SAW': 'sawtooth', 'MIC': 'triangle' };
+        channels.forEach(ch => {
+            if (!ch.oscNode || !ch.gainNode) return;
+            if (!audioEnabled || ch.type === 'OFF') {
+                ch.gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.02);
+            } else {
+                ch.oscNode.type = typeMap[ch.type] || 'sine';
+                ch.gainNode.gain.setTargetAtTime(ch.fader * 0.12, audioCtx.currentTime, 0.02);
+            }
+        });
+    }
+
+    audioToggle.addEventListener('click', () => {
+        audioEnabled = !audioEnabled;
+        if (audioEnabled) {
+            initAudio();
+            audioToggle.textContent = '🔊 Звук: ВКЛ.';
+            audioToggle.classList.add('active');
+        } else {
+            updateAudioNodes();
+            audioToggle.textContent = '🔇 Звук: ИЗКЛ.';
+            audioToggle.classList.remove('active');
+        }
+    });
+
+    for (let i = 1; i <= chCount; i++) {
+        const mod = document.createElement('div');
+        mod.className = 'channel-module';
+        mod.innerHTML = `
+            <div class="ch-scope-box">
+                <div class="overlay-text">CH ${i} • ${Math.round(chFreqs[i-1])} Hz</div>
+                <canvas id="ch-scope-${i}"></canvas>
+            </div>
+            <select id="sel-${i}">
+                <option value="OFF">MUTE (ИЗКЛ.)</option>
+                <option value="SINE" ${i === 1 ? 'selected' : ''}>SINE (СИНУСОИДА)</option>
+                <option value="SQUARE">SQUARE (ПРАВОЪГЪЛНА)</option>
+                <option value="SAW">SAWTOOTH (ТРИОНООБРАЗНА)</option>
+                <option value="MIC">ANALOG NOISE (ШУМ)</option>
+            </select>
+            <div class="fader-section">
+                <div class="fader-path"><div class="fader-handle" id="fh-${i}" style="bottom:${i === 1 ? 65 : 26}px;"></div></div>
+                <div class="vu-ladder" id="vu-${i}"></div>
+            </div>
+            <div class="gain-badge" id="gain-txt-${i}">A = ${i === 1 ? '0.50' : '0.20'}</div>
+        `;
+        mixer.appendChild(mod);
+
+        const vu = mod.querySelector('.vu-ladder');
+        const leds = [];
+        for (let l = 0; l < 32; l++) {
+            const led = document.createElement('div');
+            led.className = 'led-bit';
+            vu.appendChild(led);
+            leds.push(led);
+        }
+
+        const chObj = {
+            id: i,
+            type: i === 1 ? 'SINE' : 'OFF',
+            fader: i === 1 ? 0.5 : 0.2,
+            leds: leds,
+            color: chColors[i - 1],
+            canvas: document.getElementById(`ch-scope-${i}`),
+            ctx: document.getElementById(`ch-scope-${i}`).getContext('2d'),
+            gainLabel: document.getElementById(`gain-txt-${i}`),
+            currentVal: 0,
+            oscNode: null,
+            gainNode: null
+        };
+
+        const handle = mod.querySelector('.fader-handle');
+
+        function startDrag(clientY) {
+            const startY = clientY;
+            const startBottom = parseInt(handle.style.bottom, 10) || 0;
+
+            function onMove(moveY) {
+                const nb = Math.max(0, Math.min(120, startBottom + (startY - moveY)));
+                handle.style.bottom = nb + 'px';
+                chObj.fader = nb / 120;
+                chObj.gainLabel.textContent = 'A = ' + chObj.fader.toFixed(2);
+                updateAudioNodes();
+            }
+
+            const mouseMoveHandler = (ev) => onMove(ev.clientY);
+            const touchMoveHandler = (ev) => {
+                if (ev.touches.length > 0) onMove(ev.touches[0].clientY);
+            };
+            const endHandler = () => {
+                document.removeEventListener('mousemove', mouseMoveHandler);
+                document.removeEventListener('mouseup', endHandler);
+                document.removeEventListener('touchmove', touchMoveHandler);
+                document.removeEventListener('touchend', endHandler);
+            };
+
+            document.addEventListener('mousemove', mouseMoveHandler);
+            document.addEventListener('mouseup', endHandler);
+            document.addEventListener('touchmove', touchMoveHandler, { passive: true });
+            document.addEventListener('touchend', endHandler);
+        }
+
+        handle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            startDrag(e.clientY);
+        });
+        handle.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 0) startDrag(e.touches[0].clientY);
+        }, { passive: true });
+
+        mod.querySelector('select').addEventListener('change', (e) => {
+            chObj.type = e.target.value;
+            if (chObj.type === 'OFF') chObj.currentVal = 0;
+            updateAudioNodes();
+        });
+
+        channels.push(chObj);
+    }
+
+    let time = 0;
+    function render() {
+        masterCanvas.width = masterCanvas.offsetWidth;
+        masterCanvas.height = masterCanvas.offsetHeight;
+        mCtx.fillStyle = 'rgba(0,0,0,0.25)';
+        mCtx.fillRect(0, 0, masterCanvas.width, masterCanvas.height);
+        
+        // Координатна мрежа на Master осцилоскопа
+        mCtx.strokeStyle = '#111827';
+        mCtx.lineWidth = 1;
+        for (let x = 0; x < masterCanvas.width; x += 40) {
+            mCtx.beginPath(); mCtx.moveTo(x, 0); mCtx.lineTo(x, masterCanvas.height); mCtx.stroke();
+        }
+        mCtx.beginPath();
+        mCtx.moveTo(0, masterCanvas.height / 2);
+        mCtx.lineTo(masterCanvas.width, masterCanvas.height / 2);
+        mCtx.stroke();
+
+        channels.forEach((ch, idx) => {
+            ch.canvas.width = ch.canvas.offsetWidth;
+            ch.canvas.height = ch.canvas.offsetHeight;
+            const c = ch.ctx;
+            c.clearRect(0, 0, ch.canvas.width, ch.canvas.height);
+            
+            if (ch.type !== 'OFF') {
+                c.strokeStyle = '#fff';
+                c.lineWidth = 2.5;
+                c.shadowBlur = 10;
+                c.shadowColor = ch.color;
+                
+                c.beginPath();
+                const freqScale = 0.08 + idx * 0.025;
+                for (let x = 0; x < ch.canvas.width; x += 2) {
+                    const sig = oscillators[ch.type](time + x * freqScale) * ch.fader;
+                    c.lineTo(x, (ch.canvas.height / 2) + sig * 40);
+                    if (x === 10) ch.currentVal = Math.abs(sig);
+                }
+                c.stroke();
+                
+                c.strokeStyle = ch.color;
+                c.lineWidth = 1;
+                c.shadowBlur = 0;
+                c.stroke();
+            } else {
+                ch.currentVal = 0;
+            }
+
+            // VU LED индикатори
+            const act = Math.floor(ch.currentVal * 34);
+            ch.leds.forEach((l, i) => {
+                l.style.background = i < act ? (i > 26 ? 'var(--danger)' : (i > 18 ? 'var(--amber)' : '#00ffaa')) : '#111';
+                l.style.boxShadow = i < act ? '0 0 6px currentColor' : 'none';
+            });
+        });
+
+        // MASTER TRACE - СУМАРЕН СИГНАЛ
+        mCtx.beginPath();
+        mCtx.strokeStyle = '#fff';
+        mCtx.lineWidth = 3;
+        mCtx.shadowBlur = 15;
+        mCtx.shadowColor = '#f0abfc';
+        for (let x = 0; x < masterCanvas.width; x += 2) {
+            let sum = 0;
+            channels.forEach((ch, idx) => {
+                const freqScale = 0.035 + idx * 0.012;
+                sum += oscillators[ch.type](time + x * freqScale) * ch.fader;
+            });
+            mCtx.lineTo(x, (masterCanvas.height / 2) + sum * 55);
+        }
+        mCtx.stroke();
+
+        time += 0.14;
+        requestAnimationFrame(render);
+    }
+    render();
+</script>
+</body>
+</html>
